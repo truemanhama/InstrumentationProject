@@ -1,0 +1,107 @@
+
+//TODO Add code for the output from the comparator 
+//TODO Case 1 Within the Limit(Range) - output from third comparator = 0 
+//TODO Case 2 Outside the range - Exceeding - Output from third comparator = 1
+//TODO Turning on motor when exceeding the range - change speed using push IR_out - extra input 
+
+//total inputs - from comparator, from push IR_out, from op amp of IR, 
+
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// Initialize the LCD with the I2C address (commonly 0x27 or 0x3F)
+LiquidCrystal_I2C lcd(0x27, 16, 2); 
+
+
+
+
+// Declaring variables
+int count = 0;
+int previousState = 0;
+int IR_out = 8; ///output from the IR set up of the ST188    
+int comparator = 5;
+int pushButton = 3; //to control speed of the motor 
+int motorPin = 9; //PWM pin to the motor 
+unsigned long previousMillis = 0; // Store the last time the count was reset
+const unsigned long interval = 5000; // Interval in milliseconds 
+static bool buttonPressed = false;
+
+void setup() {
+  pinMode(IR_out, INPUT);
+  pinMode(comparator, INPUT);
+  pinMode(pushButton, INPUT_PULLUP);
+  pinMode(motorPin, OUTPUT);
+  Serial.begin(9600);
+  lcd.init();              
+  lcd.backlight();         
+  lcd.setCursor(0, 0);      
+  lcd.print("Temp Sensor"); 
+  lcd.setCursor(0, 1);      
+  lcd.print("Loading...");
+}
+
+void loop() {
+  int compState = digitalRead(comparator);
+  if (compState == 0){
+    analogWrite(motorPin, 0); //turn off the motor when within the required range. 
+    
+    lcd.setCursor(0, 0);   // Set cursor  (first row)
+    lcd.print("Within Range");
+
+    // Print on the second row
+    lcd.setCursor(0, 1);   // Set cursor to column 0, row 1 (second row)
+    lcd.print("Fan is Off");
+  }
+
+  else{
+    
+    //analogWrite(motorPin, 200); //Initial Speed 
+    int IR_outState = digitalRead(IR_out);
+    int pushButtonState = digitalRead(pushButton);
+
+    if(pushButtonState == 0){ //when the buttonn is pressed, increase the speed 
+      analogWrite(motorPin, 150); //increased speed
+
+    }
+
+
+    else{ //when the buttonn is pressed, increase the speed 
+      analogWrite(motorPin, 255); //increased speed
+      Serial.println("Button pressed");
+    }
+
+    // set up to calculate the speed of the motor 
+    if (IR_outState != previousState) {
+      if (IR_outState == HIGH) { // high when the IR set up has an impedement from the motor 
+        count++;
+        previousState = HIGH;
+      } else {
+        previousState = LOW;
+      }
+    }
+
+    // Calculate speed every  5 seconds
+    unsigned long currentMillis = millis();
+    if (currentMillis - previousMillis >= interval) {
+      previousMillis = currentMillis;
+
+      // Calculate speed (cpm)
+      int speed = count * 12;
+      Serial.print("Speed (cpm): ");
+        lcd.clear(); //clearing the LCD 
+      lcd.setCursor(0, 0);   // Set cursor  (first row)
+      lcd.print("Beyond Limit");
+
+      // Print on the second row
+      lcd.setCursor(0, 1);   // Set cursor to column 0, row 1 (second row)
+      lcd.print("RPM:");
+      lcd.setCursor(6, 1);
+      lcd.print(speed);
+      delay(50); // to avoid debounce 
+      Serial.println(speed);
+
+      // Reset the count
+      count = 0;
+  }
+  }
+}
